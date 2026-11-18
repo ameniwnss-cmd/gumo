@@ -1,0 +1,104 @@
+@model IEnumerable<Gumo.Core.Entities.Order>
+@{
+    ViewData["Title"] = "Orders Dashboard";
+    var locations = ViewBag.Locations as IEnumerable<Gumo.Core.Entities.Location>;
+    var selectedLocationId = ViewBag.SelectedLocationId as int?;
+}
+
+<div class="admin-page">
+    <div class="admin-header">
+        <h1>Orders Dashboard</h1>
+        <div class="admin-nav">
+            <a href="@Url.Action("Orders")">Orders</a>
+            <a href="@Url.Action("Menu")">Menu</a>
+            <a href="@Url.Action("Events")">Events</a>
+        </div>
+    </div>
+
+    <!-- Location filter -->
+    <div class="location-tabs">
+        <a href="@Url.Action("Orders")" class="tab @(selectedLocationId == null ? "active" : "")">All locations</a>
+        @foreach (var loc in locations!)
+        {
+            <a href="@Url.Action("Orders", new { locationId = loc.Id })"
+               class="tab @(selectedLocationId == loc.Id ? "active" : "")">
+                @loc.Name
+            </a>
+        }
+    </div>
+
+    <div id="orders-container">
+        <div class="no-orders"><p>Loading orders...</p></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const selectedLocationId = @(selectedLocationId.HasValue ? selectedLocationId.Value.ToString() : "null");
+
+    async function updateStatus(orderId, status) {
+        await fetch('@Url.Action("UpdateOrderStatus")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `orderId=${orderId}&status=${status}`
+        });
+        await pollOrders();
+    }
+
+    async function pollOrders() {
+        try {
+            const url = '/Admin/PollOrders' + (selectedLocationId ? '?locationId=' + selectedLocationId : '');
+            const res = await fetch(url);
+            if (!res.ok) {
+                document.getElementById('orders-container').innerHTML = '<div class="no-orders"><p>⚠️ Could not load orders (status ' + res.status + '). Please refresh.</p></div>';
+                return;
+            }
+            const orders = await res.json();
+            renderOrders(orders);
+        } catch (e) {
+            document.getElementById('orders-container').innerHTML = '<div class="no-orders"><p>⚠️ Connection error. Retrying...</p></div>';
+        }
+    }
+
+    function renderOrders(orders) {
+        const container = document.getElementById('orders-container');
+        if (orders.length === 0) {
+            container.innerHTML = '<div class="no-orders"><p>No active orders right now.</p></div>';
+            return;
+        }
+
+        container.innerHTML = orders.map(o => `
+            <div class="order-card status-${o.status.toLowerCase()}">
+                <div class="order-card-header">
+                    <span class="order-id">#${o.id}</span>
+                    <span class="order-location">📍 ${o.location}</span>
+                    <span class="order-time">🕐 ${o.createdAt}</span>
+                    <span class="order-status badge-${o.status.toLowerCase()}">${o.status}</span>
+                </div>
+                <div class="order-card-body">
+                    <div class="order-customer">
+                        <strong>${o.customerName}</strong>
+                        <span>${o.customerEmail}</span>
+                        ${o.customerPhone ? `<span>${o.customerPhone}</span>` : ''}
+                    </div>
+                    <div class="order-items">
+                        ${o.items.map(i => `<div class="order-item">${i.name} × ${i.quantity} — €${(i.unitPrice * i.quantity).toFixed(2)}</div>`).join('')}
+                    </div>
+                    <div class="order-total">Total: <strong>€${o.total.toFixed(2)}</strong></div>
+                    ${o.notes ? `<div class="order-notes">📝 ${o.notes}</div>` : ''}
+                </div>
+                <div class="order-card-actions">
+                    ${o.status === 'Pending' ? `<button class="btn-confirm" onclick="updateStatus(${o.id}, 1)">✅ Confirm</button>` : ''}
+                    ${o.status === 'Confirmed' ? `<button class="btn-ready" onclick="updateStatus(${o.id}, 2)">☕ Mark Ready</button>` : ''}
+                    ${o.status === 'Ready' ? `<button class="btn-pickup" onclick="updateStatus(${o.id}, 3)">📦 Picked Up</button>` : ''}
+                    ${o.status !== 'Cancelled' ? `<button class="btn-cancel" onclick="updateStatus(${o.id}, 4)">✕ Cancel</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Load immediately then poll every 5 seconds
+    pollOrders();
+    setInterval(pollOrders, 5000);
+</script>
+}

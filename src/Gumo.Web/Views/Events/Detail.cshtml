@@ -1,0 +1,136 @@
+@model Gumo.Core.Entities.Event
+@{
+    ViewData["Title"] = Model.Title;
+    bool soldOut = Model.AvailableSeats == 0;
+}
+
+<div class="event-detail-page">
+    <a href="@Url.Action("Index")" class="back-link">← Back to events</a>
+
+    <div class="event-detail-hero">
+        @if (!string.IsNullOrEmpty(Model.ImageFileName))
+        {
+            <img src="/img/events/@Model.ImageFileName" alt="@Model.Title" class="event-detail-img" />
+        }
+    </div>
+
+    <div class="event-detail-content">
+        <div class="event-detail-info">
+            <div class="event-meta">
+                <span>📅 @Model.Date.ToString("dddd, MMMM d, yyyy · HH:mm")</span>
+                <span>📍 @Model.Location.Name — @Model.Location.Address</span>
+                <span>🎟 @Model.AvailableSeats / @Model.Capacity seats available</span>
+            </div>
+            <h1>@Model.Title</h1>
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <p class="event-full-desc">@Model.Description</p>
+            }
+        </div>
+
+        <!-- Booking form -->
+        <div class="booking-form-card">
+            @if (soldOut)
+            {
+                <div class="sold-out-msg">
+                    <h3>😔 This event is sold out</h3>
+                    <p>Follow us on <a href="https://www.instagram.com/gumo_club/" target="_blank">Instagram</a> for future events.</p>
+                </div>
+            }
+            else
+            {
+                <h2>Reserve your seats</h2>
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" id="customerName" placeholder="Your full name" required />
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="customerEmail" placeholder="your@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label>Phone (optional)</label>
+                    <input type="tel" id="customerPhone" placeholder="+49 ..." />
+                </div>
+                <div class="form-group">
+                    <label>Number of seats *</label>
+                    <select id="numberOfSeats">
+                        @for (int i = 1; i <= Math.Min(Model.AvailableSeats, 10); i++)
+                        {
+                            <option value="@i">@i seat@(i > 1 ? "s" : "")</option>
+                        }
+                    </select>
+                </div>
+
+                <button id="btn-book" class="btn-primary" onclick="submitBooking()">
+                    Confirm Booking
+                </button>
+                <div id="booking-error" class="error-msg hidden"></div>
+            }
+        </div>
+    </div>
+
+    <!-- Success modal -->
+    <div id="booking-success" class="modal hidden">
+        <div class="modal-content">
+            <h2>🎉 You're in!</h2>
+            <p>A confirmation email is on its way to <strong id="confirm-email"></strong> with your QR code.</p>
+            <div class="confirm-code-box">
+                <p>Your code:</p>
+                <strong id="confirm-code" class="confirm-code"></strong>
+            </div>
+            <p class="modal-hint">Show the QR code in your email at the door. It works once only.</p>
+            <a href="@Url.Action("Index")" class="btn-primary">Back to events</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    async function submitBooking() {
+        const name = document.getElementById('customerName').value.trim();
+        const email = document.getElementById('customerEmail').value.trim();
+        const phone = document.getElementById('customerPhone').value.trim();
+        const seats = parseInt(document.getElementById('numberOfSeats').value);
+        const errorEl = document.getElementById('booking-error');
+
+        if (!name || !email) {
+            errorEl.textContent = 'Please fill in your name and email.';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('btn-book').disabled = true;
+
+        try {
+            const res = await fetch('/Events/Book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId: @Model.Id,
+                    customerName: name,
+                    customerEmail: email,
+                    customerPhone: phone || null,
+                    numberOfSeats: seats
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('confirm-email').textContent = email;
+                document.getElementById('confirm-code').textContent = data.confirmationCode;
+                document.getElementById('booking-success').classList.remove('hidden');
+            } else {
+                const err = await res.json().catch(() => ({ error: 'Something went wrong. Please try again.' }));
+                errorEl.textContent = err.error || 'Something went wrong. Please try again.';
+                errorEl.classList.remove('hidden');
+                document.getElementById('btn-book').disabled = false;
+            }
+        } catch {
+            errorEl.textContent = 'Connection error. Please try again.';
+            errorEl.classList.remove('hidden');
+            document.getElementById('btn-book').disabled = false;
+        }
+    }
+</script>
+}

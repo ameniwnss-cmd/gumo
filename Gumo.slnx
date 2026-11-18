@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Gumo.Core/Gumo.Core.csproj" />
+    <Project Path="src/Gumo.Infrastructure/Gumo.Infrastructure.csproj" />
+    <Project Path="src/Gumo.Web/Gumo.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gumo.Tests/Gumo.Tests.csproj" />
+  </Folder>
+</Solution>

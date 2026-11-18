@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+.vs/
+
+## Local database (contains customer data and credentials)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+
+## Secrets / local config
+.env
+appsettings.*.local.json
+secrets.json
+
+## Uploaded content
+src/Gumo.Web/wwwroot/img/events/
+
+## Saved copy of the third-party GuMo website (reference only, not redistributed)
+GuMo4u.html
+GuMo4u_files/
+
+## Misc
+*.swp
+.DS_Store

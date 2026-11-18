@@ -1,0 +1,86 @@
+@model Gumo.Core.Entities.Order
+@{
+    ViewData["Title"] = "Order #" + Model.Id;
+    var steps = new[] { "Pending", "Confirmed", "Ready", "PickedUp" };
+    var currentStep = (int)Model.Status;
+}
+
+<div class="tracking-page">
+    <div class="tracking-header">
+        <h1>Order #@Model.Id</h1>
+        <p class="tracking-location">📍 @Model.Location.Name</p>
+        <p class="tracking-date">Placed at @Model.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+    </div>
+
+    <!-- Status stepper -->
+    <div class="status-stepper">
+        <div class="step @(currentStep >= 0 ? "done" : "") @(currentStep == 0 ? "active" : "")">
+            <div class="step-dot"></div>
+            <span>Pending</span>
+        </div>
+        <div class="step-line @(currentStep >= 1 ? "done" : "")"></div>
+        <div class="step @(currentStep >= 1 ? "done" : "") @(currentStep == 1 ? "active" : "")">
+            <div class="step-dot"></div>
+            <span>Confirmed</span>
+        </div>
+        <div class="step-line @(currentStep >= 2 ? "done" : "")"></div>
+        <div class="step @(currentStep >= 2 ? "done" : "") @(currentStep == 2 ? "active" : "")">
+            <div class="step-dot"></div>
+            <span>Ready ☕</span>
+        </div>
+        <div class="step-line @(currentStep >= 3 ? "done" : "")"></div>
+        <div class="step @(currentStep >= 3 ? "done" : "") @(currentStep == 3 ? "active" : "")">
+            <div class="step-dot"></div>
+            <span>Picked Up ✅</span>
+        </div>
+    </div>
+
+    @if (Model.Status == Gumo.Core.Entities.OrderStatus.Ready)
+    {
+        <div class="ready-banner">
+            ☕ Your order is ready! Head to <strong>@Model.Location.Name</strong> to pick it up.
+        </div>
+    }
+    else if (Model.Status == Gumo.Core.Entities.OrderStatus.Cancelled)
+    {
+        <div class="cancelled-banner">
+            ❌ This order was cancelled. Please contact us if you have questions.
+        </div>
+    }
+
+    <!-- Order items -->
+    <div class="tracking-items">
+        <h2>Your order</h2>
+        @foreach (var item in Model.Items)
+        {
+            <div class="tracking-item">
+                <span>@item.MenuItem.Name × @item.Quantity</span>
+                <span>€@((item.UnitPrice * item.Quantity).ToString("0.00"))</span>
+            </div>
+        }
+        <div class="tracking-total">
+            <strong>Total</strong>
+            <strong>€@Model.Items.Sum(i => i.UnitPrice * i.Quantity).ToString("0.00")</strong>
+        </div>
+        <p class="pay-notice">💳 Pay at the counter when you pick up.</p>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const token = '@Model.TrackingToken';
+    const currentStatus = '@Model.Status';
+
+    // Poll every 5 seconds if order is not yet picked up or cancelled
+    if (currentStatus !== 'PickedUp' && currentStatus !== 'Cancelled') {
+        setInterval(async () => {
+            const res = await fetch('/OrderTracking/Status/' + token);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status !== currentStatus) {
+                window.location.reload();
+            }
+        }, 5000);
+    }
+</script>
+}

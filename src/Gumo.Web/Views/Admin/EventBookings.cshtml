@@ -1,0 +1,98 @@
+@model Gumo.Core.Entities.Event
+@{
+    ViewData["Title"] = "Bookings — " + Model.Title;
+}
+
+<div class="admin-page">
+    <div class="admin-header">
+        <div>
+            <a href="@Url.Action("Events")" class="back-link" style="font-size:.85rem;color:var(--muted)">← Back to Events</a>
+            <h1 style="margin-top:.25rem">@Model.Title</h1>
+            <p style="color:var(--muted);font-size:.9rem">
+                📅 @Model.Date.ToString("ddd, MMM d, yyyy · HH:mm") &nbsp;·&nbsp;
+                📍 @Model.Location.Name &nbsp;·&nbsp;
+                🎟 @Model.BookedSeats / @Model.Capacity seats booked
+            </p>
+        </div>
+        <button class="btn-primary" onclick="generateCheckInLink()">📷 Generate Check-In Link</button>
+        <div id="checkin-link-box" class="hidden" style="margin-top:1rem;background:var(--bg-soft);border:1.5px dashed var(--border);border-radius:var(--radius);padding:1rem">
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem">Send this link to staff — it expires when they close the tab:</p>
+            <div style="display:flex;gap:.75rem;align-items:center">
+                <code id="checkin-link-url" style="font-size:.85rem;word-break:break-all;flex:1"></code>
+                <button class="btn-secondary" onclick="copyLink()" style="flex-shrink:0">Copy</button>
+                <button class="btn-delete" onclick="revokeLink()" style="flex-shrink:0">Revoke</button>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Bookings.Any())
+    {
+        <div class="no-orders"><p>No bookings yet for this event.</p></div>
+    }
+    else
+    {
+        <div class="admin-items-table" style="margin-top:1rem">
+            <div class="admin-items-head" style="grid-template-columns:2fr 2fr 1fr 1fr 1fr 1fr">
+                <span>Name</span>
+                <span>Email</span>
+                <span>Seats</span>
+                <span>Code</span>
+                <span>Booked at</span>
+                <span>Status</span>
+            </div>
+            @foreach (var booking in Model.Bookings.OrderByDescending(b => b.BookedAt))
+            {
+                <div class="admin-item-row" style="grid-template-columns:2fr 2fr 1fr 1fr 1fr 1fr">
+                    <span>@booking.CustomerName</span>
+                    <span style="font-size:.85rem;color:var(--muted)">@booking.CustomerEmail</span>
+                    <span><strong>@booking.NumberOfSeats</strong></span>
+                    <span style="font-family:monospace;font-size:.8rem;letter-spacing:.05em">@booking.ConfirmationCode</span>
+                    <span style="font-size:.82rem;color:var(--muted)">@booking.BookedAt.ToLocalTime().ToString("MMM d, HH:mm")</span>
+                    <span>
+                        @if (booking.IsUsed)
+                        {
+                            <span class="badge-used">✅ Used @booking.UsedAt?.ToLocalTime().ToString("HH:mm")</span>
+                        }
+                        else
+                        {
+                            <span class="badge-pending-small">Pending</span>
+                        }
+                    </span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+    let currentToken = null;
+
+    async function generateCheckInLink() {
+        const res = await fetch('@Url.Action("GenerateSession", "CheckIn")', { method: 'POST' });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentToken = data.token;
+        document.getElementById('checkin-link-url').textContent = data.url;
+        document.getElementById('checkin-link-box').classList.remove('hidden');
+    }
+
+    function copyLink() {
+        const url = document.getElementById('checkin-link-url').textContent;
+        navigator.clipboard.writeText(url);
+        showToast('Link copied to clipboard!');
+    }
+
+    async function revokeLink() {
+        if (!currentToken) return;
+        await fetch('@Url.Action("RevokeSession", "CheckIn")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: currentToken })
+        });
+        currentToken = null;
+        document.getElementById('checkin-link-box').classList.add('hidden');
+        showToast('Check-in link revoked.');
+    }
+</script>
+}

@@ -1,0 +1,233 @@
+@model IEnumerable<Gumo.Core.Entities.Category>
+@{
+    ViewData["Title"] = "Menu Management";
+}
+
+<div class="admin-page">
+    <div class="admin-header">
+        <h1>Menu Management</h1>
+        <div class="admin-nav">
+            <a href="@Url.Action("Orders")">Orders</a>
+            <a href="@Url.Action("Menu")" style="color:var(--dark);border-color:var(--gray)">Menu</a>
+            <a href="@Url.Action("Events")">Events</a>
+        </div>
+    </div>
+
+    @foreach (var category in Model)
+    {
+        <div class="admin-category">
+            <div class="admin-category-header">
+                <h2>@category.Name</h2>
+                <button class="btn-secondary" onclick="openAddItem(@category.Id, '@category.Name')">+ Add item</button>
+            </div>
+            <div class="admin-items-table">
+                <div class="admin-items-head">
+                    <span>Item</span>
+                    <span>Price</span>
+                    <span>Vegan</span>
+                    <span>Available</span>
+                    <span></span>
+                </div>
+                @foreach (var item in category.MenuItems)
+                {
+                    <div class="admin-item-row" id="item-row-@item.Id">
+                        <span class="admin-item-name">
+                            @if (!string.IsNullOrEmpty(item.ImageFileName))
+                            {
+                                <img src="/img/menu/@item.ImageFileName" alt="" class="admin-item-thumb" />
+                            }
+                            @item.Name
+                        </span>
+                        <span>€@item.Price.ToString("0.00")</span>
+                        <span>@(item.IsVegan ? "🌱" : "—")</span>
+                        <span>
+                            <button class="toggle-btn @(item.IsAvailable ? "available" : "unavailable")"
+                                    onclick="toggleItem(@item.Id, this)">
+                                @(item.IsAvailable ? "✅ On" : "❌ Off")
+                            </button>
+                        </span>
+                        <span class="admin-item-actions">
+                            <button class="btn-edit" onclick="openEditItem(@item.Id, '@Html.Raw(item.Name.Replace("'","\\'"  ))', @item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), '@Html.Raw((item.Description ?? "").Replace("'","\\'"))', @item.CategoryId, @item.IsVegan.ToString().ToLower(), @item.IsAvailable.ToString().ToLower(), '@(item.ImageFileName ?? "")')">Edit</button>
+                            <button class="btn-delete" onclick="deleteItem(@item.Id)">Delete</button>
+                        </span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="item-modal" class="modal hidden">
+    <div class="modal-content" style="text-align:left;max-width:480px">
+        <h2 id="modal-title" style="font-family:var(--font-serif);margin-bottom:1.5rem">Add Item</h2>
+        <input type="hidden" id="modal-item-id" value="0" />
+        <input type="hidden" id="modal-category-id" value="0" />
+        <input type="hidden" id="modal-image-filename" value="" />
+        <div class="form-group">
+            <label>Image</label>
+            <div class="upload-area" onclick="document.getElementById('modal-image-input').click()">
+                <img id="modal-image-preview" src="" alt="" class="upload-preview hidden" />
+                <div id="upload-placeholder" class="upload-placeholder">
+                    <span>📷</span><span>Click to upload image</span>
+                </div>
+            </div>
+            <input type="file" id="modal-image-input" accept="image/*" style="display:none" onchange="handleMenuImageUpload(this)" />
+            <div id="upload-progress" class="hidden" style="font-size:.82rem;color:var(--muted);margin-top:.4rem">Uploading...</div>
+        </div>
+        <div class="form-group">
+            <label>Name *</label>
+            <input type="text" id="modal-name" />
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="modal-desc" />
+        </div>
+        <div class="form-group">
+            <label>Price (€) *</label>
+            <input type="number" id="modal-price" step="0.01" min="0" />
+        </div>
+        <div style="display:flex;gap:1.5rem;margin-bottom:1.25rem">
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                <input type="checkbox" id="modal-vegan" /> Vegan
+            </label>
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                <input type="checkbox" id="modal-available" checked /> Available
+            </label>
+        </div>
+        <div style="display:flex;gap:1rem">
+            <button class="btn-primary" onclick="saveItem()">Save</button>
+            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+        </div>
+        <div id="modal-error" class="error-msg hidden"></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function resetImageUpload(existingImg) {
+        document.getElementById('modal-image-filename').value = existingImg || '';
+        document.getElementById('modal-image-input').value = '';
+        const preview = document.getElementById('modal-image-preview');
+        const placeholder = document.getElementById('upload-placeholder');
+        if (existingImg) {
+            preview.src = '/img/menu/' + existingImg;
+            preview.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        } else {
+            preview.src = '';
+            preview.classList.add('hidden');
+            placeholder.classList.remove('hidden');
+        }
+    }
+
+    async function handleMenuImageUpload(input) {
+        if (!input.files[0]) return;
+        const progress = document.getElementById('upload-progress');
+        progress.classList.remove('hidden');
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        formData.append('folder', 'menu');
+        const res = await fetch('@Url.Action("UploadImage")', { method: 'POST', body: formData });
+        progress.classList.add('hidden');
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('modal-image-filename').value = data.fileName;
+            const preview = document.getElementById('modal-image-preview');
+            preview.src = '/img/menu/' + data.fileName;
+            preview.classList.remove('hidden');
+            document.getElementById('upload-placeholder').classList.add('hidden');
+        } else {
+            alert('Image upload failed. Please try again.');
+        }
+    }
+
+    function openAddItem(categoryId, categoryName) {
+        document.getElementById('modal-title').textContent = 'Add item to ' + categoryName;
+        document.getElementById('modal-item-id').value = 0;
+        document.getElementById('modal-category-id').value = categoryId;
+        document.getElementById('modal-name').value = '';
+        document.getElementById('modal-desc').value = '';
+        document.getElementById('modal-price').value = '';
+        document.getElementById('modal-vegan').checked = false;
+        document.getElementById('modal-available').checked = true;
+        document.getElementById('modal-error').classList.add('hidden');
+        resetImageUpload(null);
+        document.getElementById('item-modal').classList.remove('hidden');
+    }
+
+    function openEditItem(id, name, price, desc, categoryId, isVegan, isAvailable, imageFileName) {
+        document.getElementById('modal-title').textContent = 'Edit item';
+        document.getElementById('modal-item-id').value = id;
+        document.getElementById('modal-category-id').value = categoryId;
+        document.getElementById('modal-name').value = name;
+        document.getElementById('modal-desc').value = desc;
+        document.getElementById('modal-price').value = price;
+        document.getElementById('modal-vegan').checked = isVegan;
+        document.getElementById('modal-available').checked = isAvailable;
+        document.getElementById('modal-error').classList.add('hidden');
+        resetImageUpload(imageFileName || null);
+        document.getElementById('item-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('item-modal').classList.add('hidden');
+    }
+
+    async function saveItem() {
+        const name = document.getElementById('modal-name').value.trim();
+        const price = parseFloat(document.getElementById('modal-price').value);
+        if (!name || isNaN(price)) {
+            document.getElementById('modal-error').textContent = 'Name and price are required.';
+            document.getElementById('modal-error').classList.remove('hidden');
+            return;
+        }
+        const res = await fetch('@Url.Action("SaveMenuItem")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: parseInt(document.getElementById('modal-item-id').value),
+                categoryId: parseInt(document.getElementById('modal-category-id').value),
+                name,
+                description: document.getElementById('modal-desc').value.trim() || null,
+                price,
+                isVegan: document.getElementById('modal-vegan').checked,
+                isAvailable: document.getElementById('modal-available').checked,
+                imageFileName: document.getElementById('modal-image-filename').value || null
+            })
+        });
+        if (res.ok) { closeModal(); window.location.reload(); }
+        else {
+            document.getElementById('modal-error').textContent = 'Failed to save. Please try again.';
+            document.getElementById('modal-error').classList.remove('hidden');
+        }
+    }
+
+    async function toggleItem(id, btn) {
+        const res = await fetch('@Url.Action("ToggleMenuItem")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'id=' + id
+        });
+        if (res.ok) {
+            const data = await res.json();
+            btn.textContent = data.isAvailable ? '✅ On' : '❌ Off';
+            btn.className = 'toggle-btn ' + (data.isAvailable ? 'available' : 'unavailable');
+        }
+    }
+
+    async function deleteItem(id) {
+        if (!confirm('Delete this item? This cannot be undone.')) return;
+        const res = await fetch('@Url.Action("DeleteMenuItem")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'id=' + id
+        });
+        if (res.ok) document.getElementById('item-row-' + id).remove();
+    }
+
+    document.getElementById('item-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+</script>
+}

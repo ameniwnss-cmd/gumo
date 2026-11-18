@@ -1,0 +1,113 @@
+@model IEnumerable<Gumo.Core.Entities.MenuItem>
+@{
+    ViewData["Title"] = "Menu";
+    var categories = ViewBag.Categories as IEnumerable<Gumo.Core.Entities.Category>;
+    var selectedCategoryId = ViewBag.SelectedCategoryId as int?;
+}
+
+<div class="menu-page">
+    <div class="menu-header">
+        <h1>Our Menu</h1>
+        <p>Fresh, seasonal, made with love in Cologne.</p>
+    </div>
+
+    <!-- Category filter tabs -->
+    <div class="category-tabs">
+        <a href="@Url.Action("Index")"
+           class="tab @(selectedCategoryId == null ? "active" : "")">
+            All
+        </a>
+        @foreach (var cat in categories!)
+        {
+            <a href="@Url.Action("Index", new { categoryId = cat.Id })"
+               class="tab @(selectedCategoryId == cat.Id ? "active" : "")">
+                @cat.Name
+            </a>
+        }
+    </div>
+
+    <!-- Cart summary bar -->
+    <div id="cart-bar" class="cart-bar hidden">
+        <span id="cart-count">0 items</span>
+        <a href="@Url.Action("Index", "Cart")" class="btn-cart">View Cart &rarr;</a>
+    </div>
+
+    <!-- Menu items grid -->
+    <div class="menu-grid">
+        @foreach (var item in Model)
+        {
+            <div class="menu-card" data-id="@item.Id" data-name="@item.Name" data-price="@item.Price">
+                <div class="menu-card-image">
+                    @if (!string.IsNullOrEmpty(item.ImageFileName))
+                    {
+                        <img src="/img/menu/@item.ImageFileName" alt="@item.Name" loading="lazy" />
+                    }
+                    else
+                    {
+                        <div class="menu-card-placeholder">
+                            <span>☕</span>
+                        </div>
+                    }
+                    @if (item.IsVegan)
+                    {
+                        <span class="vegan-badge">Vegan</span>
+                    }
+                </div>
+                <div class="menu-card-body">
+                    <h3 class="menu-card-name">@item.Name</h3>
+                    @if (!string.IsNullOrEmpty(item.Description))
+                    {
+                        <p class="menu-card-desc">@item.Description</p>
+                    }
+                    <div class="menu-card-footer">
+                        <span class="menu-card-price">€@item.Price.ToString("0.00")</span>
+                        <button class="btn-add" onclick="addToCart(@item.Id, '@Html.Raw(item.Name.Replace("'", "\\'"))', @item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))">
+                            + Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const cart = JSON.parse(localStorage.getItem('gumo_cart') || '[]');
+
+    function addToCart(id, name, price) {
+        const existing = cart.find(i => i.id === id);
+        if (existing) {
+            existing.qty++;
+        } else {
+            cart.push({ id, name, price, qty: 1 });
+        }
+        localStorage.setItem('gumo_cart', JSON.stringify(cart));
+        updateCartBar();
+        showToast(name + ' added to cart');
+    }
+
+    function updateCartBar() {
+        const total = cart.reduce((sum, i) => sum + i.qty, 0);
+        const bar = document.getElementById('cart-bar');
+        const count = document.getElementById('cart-count');
+        if (total > 0) {
+            count.textContent = total + (total === 1 ? ' item' : ' items');
+            bar.classList.remove('hidden');
+        } else {
+            bar.classList.add('hidden');
+        }
+    }
+
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+
+    updateCartBar();
+</script>
+}

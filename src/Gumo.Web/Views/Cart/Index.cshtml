@@ -1,0 +1,156 @@
+@{
+    ViewData["Title"] = "Your Cart";
+    var locations = ViewBag.Locations as IEnumerable<Gumo.Core.Entities.Location>;
+}
+
+<div class="cart-page">
+    <h1>Your Cart</h1>
+
+    <div id="cart-empty" class="cart-empty hidden">
+        <p>Your cart is empty. <a href="@Url.Action("Index", "Menu")">Browse the menu</a></p>
+    </div>
+
+    <div id="cart-content">
+        <div id="cart-items" class="cart-items"></div>
+
+        <div class="cart-summary">
+            <div class="cart-total">
+                Total: <strong id="cart-total">€0.00</strong>
+            </div>
+
+            <div class="checkout-form">
+                <h2>Your details</h2>
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" id="customerName" placeholder="Your full name" required />
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="customerEmail" placeholder="your@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label>Phone (optional)</label>
+                    <input type="tel" id="customerPhone" placeholder="+49 ..." />
+                </div>
+                <div class="form-group">
+                    <label>Pickup location *</label>
+                    <select id="locationId" required>
+                        <option value="">Select a location</option>
+                        @foreach (var loc in locations!)
+                        {
+                            <option value="@loc.Id">@loc.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea id="notes" placeholder="Allergies, special requests..."></textarea>
+                </div>
+
+                <p class="pay-notice">💳 Payment at the counter when you pick up your order.</p>
+
+                <button id="btn-checkout" class="btn-primary" onclick="submitOrder()">
+                    Place Order
+                </button>
+                <div id="checkout-error" class="error-msg hidden"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const cart = JSON.parse(localStorage.getItem('gumo_cart') || '[]');
+
+    function renderCart() {
+        const container = document.getElementById('cart-items');
+        const emptyMsg = document.getElementById('cart-empty');
+        const content = document.getElementById('cart-content');
+
+        if (cart.length === 0) {
+            emptyMsg.classList.remove('hidden');
+            content.classList.add('hidden');
+            return;
+        }
+
+        emptyMsg.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        container.innerHTML = cart.map((item, idx) => `
+            <div class="cart-item">
+                <div class="cart-item-info">
+                    <span class="cart-item-name">${item.name}</span>
+                    <span class="cart-item-price">€${(item.price * item.qty).toFixed(2)}</span>
+                </div>
+                <div class="cart-item-qty">
+                    <button onclick="changeQty(${idx}, -1)">−</button>
+                    <span>${item.qty}</span>
+                    <button onclick="changeQty(${idx}, 1)">+</button>
+                    <button class="btn-remove" onclick="removeItem(${idx})">✕</button>
+                </div>
+            </div>
+        `).join('');
+
+        const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+        document.getElementById('cart-total').textContent = '€' + total.toFixed(2);
+    }
+
+    function changeQty(idx, delta) {
+        cart[idx].qty += delta;
+        if (cart[idx].qty <= 0) cart.splice(idx, 1);
+        localStorage.setItem('gumo_cart', JSON.stringify(cart));
+        renderCart();
+    }
+
+    function removeItem(idx) {
+        cart.splice(idx, 1);
+        localStorage.setItem('gumo_cart', JSON.stringify(cart));
+        renderCart();
+    }
+
+    async function submitOrder() {
+        const name = document.getElementById('customerName').value.trim();
+        const email = document.getElementById('customerEmail').value.trim();
+        const phone = document.getElementById('customerPhone').value.trim();
+        const locationId = parseInt(document.getElementById('locationId').value);
+        const notes = document.getElementById('notes').value.trim();
+        const errorEl = document.getElementById('checkout-error');
+
+        if (!name || !email || !locationId) {
+            errorEl.textContent = 'Please fill in your name, email and pickup location.';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        const payload = {
+            customerName: name,
+            customerEmail: email,
+            customerPhone: phone || null,
+            locationId,
+            notes: notes || null,
+            items: cart.map(i => ({ menuItemId: i.id, quantity: i.qty }))
+        };
+
+        document.getElementById('btn-checkout').disabled = true;
+
+        const res = await fetch('@Url.Action("Checkout", "Cart")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            localStorage.removeItem('gumo_cart');
+            window.location.href = '/order/track/' + data.trackingToken;
+        } else {
+            const err = await res.json();
+            errorEl.textContent = err.error || 'Something went wrong. Please try again.';
+            errorEl.classList.remove('hidden');
+            document.getElementById('btn-checkout').disabled = false;
+        }
+    }
+
+    renderCart();
+</script>
+}

@@ -1,0 +1,154 @@
+@model IEnumerable<Gumo.Core.Entities.Event>
+@{
+    ViewData["Title"] = null;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-text">
+            <p class="hero-eyebrow">Cologne · Belgisches Viertel & Deutz</p>
+            <h1 class="hero-title">Coffee,<br>Community &<br>Good Vibes.</h1>
+            <p class="hero-sub">Two locations. One feeling. Pre-order your coffee and join our events.</p>
+            <div class="hero-actions">
+                <a href="/Menu" class="btn-primary">Order Now</a>
+                <a href="/Events" class="btn-secondary">Upcoming Events</a>
+            </div>
+        </div>
+        <div class="hero-logo">
+            <img src="/img/logo.png" alt="GuMo" />
+        </div>
+    </div>
+</section>
+
+<!-- Features strip -->
+<section class="features-strip">
+    <div class="features-inner">
+        <div class="feature">
+            <span class="feature-icon">☕</span>
+            <div>
+                <h3>Pre-order online</h3>
+                <p>Skip the wait. Order ahead and pick up at your location.</p>
+            </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature">
+            <span class="feature-icon">📍</span>
+            <div>
+                <h3>Two locations</h3>
+                <p>Belgisches Viertel & Deutz — both in the heart of Cologne.</p>
+            </div>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature">
+            <span class="feature-icon">🎵</span>
+            <div>
+                <h3>Events & experiences</h3>
+                <p>Music nights, pop-ups and community gatherings.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Menu teaser -->
+<section class="home-section">
+    <div class="home-section-inner">
+        <div class="home-section-header">
+            <div>
+                <h2 class="section-title">What's on the menu?</h2>
+                <p class="section-sub">From signature lattes to fresh acai bowls — made to order.</p>
+            </div>
+            <a href="/Menu" class="btn-secondary">Full menu →</a>
+        </div>
+        <div class="menu-teaser-grid">
+            <div class="menu-teaser-card">
+                <div class="menu-teaser-emoji">☕</div>
+                <h4>Kaffee</h4>
+                <p>Espresso, Flat White, Matcha, Chai & our signature Biscoff Latte</p>
+            </div>
+            <div class="menu-teaser-card">
+                <div class="menu-teaser-emoji">🥯</div>
+                <h4>Bagels & Focaccia</h4>
+                <p>11 bagel varieties and 8 focaccia — from GOAT to Bella Mortadella</p>
+            </div>
+            <div class="menu-teaser-card">
+                <div class="menu-teaser-emoji">🫐</div>
+                <h4>Acai & Oats</h4>
+                <p>Power bowls, baked oats and cold oats with seasonal toppings</p>
+            </div>
+            <div class="menu-teaser-card">
+                <div class="menu-teaser-emoji">🧃</div>
+                <h4>Juices</h4>
+                <p>Cold-pressed Mr Ginger, Sunrise, Red, Green & more</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Events teaser -->
+@if (Model.Any())
+{
+    <section class="home-section home-section-dark">
+        <div class="home-section-inner">
+            <div class="home-section-header">
+                <div>
+                    <h2 class="section-title" style="color:#fff">Upcoming Events</h2>
+                    <p class="section-sub" style="color:#999">GuMo brings people together.</p>
+                </div>
+                <a href="/Events" class="btn-secondary" style="border-color:#555;color:#ccc">All events →</a>
+            </div>
+            <div class="events-grid">
+                @foreach (var ev in Model)
+                {
+                    <a href="/Events/@ev.Slug" class="event-card event-card-dark">
+                        <div class="event-card-image">
+                            @if (!string.IsNullOrEmpty(ev.ImageFileName))
+                            {
+                                <img src="/img/events/@ev.ImageFileName" alt="@ev.Title" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="event-card-placeholder">🎵</div>
+                            }
+                            @if (ev.AvailableSeats == 0)
+                            {
+                                <span class="seats-badge full">Sold Out</span>
+                            }
+                        </div>
+                        <div class="event-card-body">
+                            <div class="event-meta">
+                                <span>📅 @ev.Date.ToString("MMM d · HH:mm")</span>
+                                <span>📍 @ev.Location.Name</span>
+                            </div>
+                            <h2 class="event-title">@ev.Title</h2>
+                            <div class="event-footer">
+                                <span class="event-seats">@ev.AvailableSeats seats left</span>
+                                <span class="event-cta">Book →</span>
+                            </div>
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<!-- Locations CTA -->
+<section class="home-section">
+    <div class="home-section-inner">
+        <div class="locations-cta">
+            <div class="location-cta-card">
+                <h3>📍 GuMo Belgisches Viertel</h3>
+                <p>Mon–Fri 8:00–18:00<br>Sat–Sun 9:00–17:00</p>
+                <a href="/Locations" class="btn-secondary">Find us →</a>
+            </div>
+            <div class="location-cta-divider"></div>
+            <div class="location-cta-card">
+                <h3>📍 GuMo Deutz</h3>
+                <p>Mon–Fri 8:00–18:00<br>Sat–Sun 9:00–17:00</p>
+                <a href="/Locations" class="btn-secondary">Find us →</a>
+            </div>
+        </div>
+    </div>
+</section>

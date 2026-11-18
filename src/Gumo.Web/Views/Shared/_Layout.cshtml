@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] != null ? ViewData["Title"] + " — GuMo" : "GuMo")</title>
+    <link rel="icon" type="image/png" href="/img/logo.png" />
+    <link rel="apple-touch-icon" href="/img/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/gumo.css" asp-append-version="true" />
+</head>
+<body>
+
+    <nav class="nav-main">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <img src="/img/logo.png" alt="GuMo" />
+            </a>
+            <button class="nav-hamburger" onclick="toggleMenu()" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="/Menu">Menu</a></li>
+                <li><a href="/Events">Events</a></li>
+                <li><a href="/Locations">Locations</a></li>
+                <li>
+                    <a href="/Cart" class="nav-cart" id="nav-cart-link">
+                        Cart <span id="nav-cart-count" class="cart-count hidden">0</span>
+                    </a>
+                </li>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <li><a href="/Admin/Orders" class="nav-admin">Admin ⚙</a></li>
+                    <li>
+                        <form method="post" asp-controller="Account" asp-action="Logout" style="margin:0">
+                            <button type="submit" class="nav-logout">Logout</button>
+                        </form>
+                    </li>
+                }
+                else
+                {
+                    <li><a href="/Account/Login" class="nav-login">Admin</a></li>
+                }
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <img src="/img/logo.png" alt="GuMo" class="footer-logo" />
+                <p>Coffee & Community in Cologne.</p>
+            </div>
+            <div class="footer-links">
+                <div>
+                    <h4>Visit us</h4>
+                    <p>GuMo Belgisches Viertel</p>
+                    <p>GuMo Deutz</p>
+                </div>
+                <div>
+                    <h4>Follow</h4>
+                    <a href="https://www.instagram.com/gumo_club/" target="_blank">Instagram</a>
+                </div>
+                <div>
+                    <h4>Quick links</h4>
+                    <a href="/Menu">Menu</a>
+                    <a href="/Events">Events</a>
+                    <a href="/CheckIn">Staff Check-In</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; @DateTime.Now.Year GuMo. All rights reserved.</p>
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <div id="toast-container"></div>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('nav-links').classList.toggle('open');
+        }
+
+        // Update cart count in nav
+        (function () {
+            const cart = JSON.parse(localStorage.getItem('gumo_cart') || '[]');
+            const total = cart.reduce((s, i) => s + i.qty, 0);
+            const badge = document.getElementById('nav-cart-count');
+            if (total > 0 && badge) {
+                badge.textContent = total;
+                badge.classList.remove('hidden');
+            }
+        })();
+
+        // Global toast
+        window.showToast = function (msg) {
+            const container = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            container.appendChild(t);
+            setTimeout(() => t.classList.add('show'), 10);
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2500);
+        };
+    </script>
+</body>
+</html>

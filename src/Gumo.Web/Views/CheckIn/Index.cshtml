@@ -1,0 +1,150 @@
+@{
+    ViewData["Title"] = "Event Check-In";
+    var token = ViewBag.Token as string;
+}
+
+<div class="checkin-page">
+    <div class="checkin-header">
+        <h1>GuMo Event Check-In</h1>
+        <p>Scan the customer's QR code or enter the code manually.</p>
+        <div id="session-indicator" class="session-active">🟢 Session active</div>
+    </div>
+
+    <div class="scanner-box">
+        <div id="reader"></div>
+        <button id="btn-start-scan" class="btn-primary" onclick="startScanner()">📷 Start Camera</button>
+        <button id="btn-stop-scan" class="btn-secondary hidden" onclick="stopScanner()">Stop Camera</button>
+    </div>
+
+    <div class="manual-entry">
+        <p>Or type the code manually:</p>
+        <div class="manual-input-row">
+            <input type="text" id="manual-code" placeholder="GUMO-XXXXXX" maxlength="11"
+                   oninput="this.value = this.value.toUpperCase()" />
+            <button class="btn-primary" onclick="verifyCode(document.getElementById('manual-code').value)">
+                Verify
+            </button>
+        </div>
+    </div>
+
+    <div id="result-box" class="result-box hidden"></div>
+</div>
+
+@section Scripts {
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+    const SESSION_TOKEN = '@token';
+    let scanner = null;
+    let sessionAlive = true;
+
+    // ── Heartbeat every 30s to keep session alive ──────────────────────────
+    async function sendHeartbeat() {
+        try {
+            const res = await fetch('@Url.Action("Heartbeat", "CheckIn")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: SESSION_TOKEN })
+            });
+            const data = await res.json();
+            if (!data.alive) killSession();
+        } catch {
+            killSession();
+        }
+    }
+
+    function killSession() {
+        sessionAlive = false;
+        stopScanner();
+        document.getElementById('session-indicator').className = 'session-expired';
+        document.getElementById('session-indicator').textContent = '🔴 Session expired — ask admin for a new link';
+        document.getElementById('btn-start-scan').disabled = true;
+        document.getElementById('manual-code').disabled = true;
+        document.querySelectorAll('.manual-input-row button').forEach(b => b.disabled = true);
+    }
+
+    // Notify server when tab is closed
+    window.addEventListener('beforeunload', () => {
+        navigator.sendBeacon('@Url.Action("RevokeSession", "CheckIn")',
+            new Blob([JSON.stringify({ token: SESSION_TOKEN })], { type: 'application/json' }));
+    });
+
+    setInterval(sendHeartbeat, 30000);
+    sendHeartbeat(); // immediate check
+
+    // ── QR Scanner ─────────────────────────────────────────────────────────
+    function startScanner() {
+        if (!sessionAlive) return;
+        document.getElementById('btn-start-scan').classList.add('hidden');
+        document.getElementById('btn-stop-scan').classList.remove('hidden');
+
+        scanner = new Html5Qrcode("reader");
+        scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (code) => { stopScanner(); verifyCode(code); },
+            () => {}
+        );
+    }
+
+    function stopScanner() {
+        if (scanner) {
+            scanner.stop().then(() => {
+                scanner = null;
+                document.getElementById('btn-start-scan').classList.remove('hidden');
+                document.getElementById('btn-stop-scan').classList.add('hidden');
+            });
+        }
+    }
+
+    // ── Verify booking ──────────────────────────────────────────────────────
+    async function verifyCode(code) {
+        if (!sessionAlive || !code?.trim()) return;
+
+        const box = document.getElementById('result-box');
+        box.className = 'result-box loading';
+        box.innerHTML = 'Checking...';
+        box.classList.remove('hidden');
+
+        const res = await fetch('@Url.Action("Verify", "CheckIn")', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code.trim(), token: SESSION_TOKEN })
+        });
+
+        if (res.status === 401) {
+            killSession();
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.result === 'valid') {
+            box.className = 'result-box valid';
+            box.innerHTML = `
+                <div class="result-icon">✅</div>
+                <h2>Valid</h2>
+                <p class="result-name">${data.customerName}</p>
+                <p class="result-seats"><strong>${data.numberOfSeats}</strong> seat${data.numberOfSeats > 1 ? 's' : ''}</p>
+                <p class="result-event">${data.eventTitle}</p>
+                <p class="result-meta">${data.eventDate} · ${data.location}</p>
+            `;
+        } else if (data.result === 'used') {
+            box.className = 'result-box used';
+            box.innerHTML = `
+                <div class="result-icon">⚠️</div>
+                <h2>Already Used</h2>
+                <p>This code was already scanned at <strong>${data.usedAt}</strong>.</p>
+            `;
+        } else {
+            box.className = 'result-box invalid';
+            box.innerHTML = `
+                <div class="result-icon">❌</div>
+                <h2>Invalid Code</h2>
+                <p>This code does not match any booking.</p>
+            `;
+        }
+
+        document.getElementById('manual-code').value = '';
+    }
+</script>
+}
